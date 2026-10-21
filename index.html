@@ -1,1 +1,658 @@
 
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Đua Vịt Pro - Duck Racing</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        body {
+            margin: 0;
+            padding: 0;
+            background: #1a1a2e;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #fff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+        #game-container {
+            position: relative;
+            width: 100%;
+            max-width: 480px;
+            height: 100vh;
+            max-height: 800px;
+            background: #222;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        canvas {
+            display: block;
+            background: #4a7c59;
+            width: 100%;
+            flex-grow: 1;
+        }
+        .ui-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+            padding: 20px;
+            text-align: center;
+        }
+        .hidden {
+            display: none !important;
+        }
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            color: #ffd700;
+            text-shadow: 0 3px 6px rgba(0,0,0,0.5);
+        }
+        p {
+            font-size: 1.1rem;
+            margin-bottom: 25px;
+            color: #ccc;
+        }
+        .btn {
+            background: linear-gradient(135deg, #ff7b00, #ffae00);
+            color: white;
+            border: none;
+            padding: 14px 32px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 5px 15px rgba(255, 123, 0, 0.4);
+            transition: transform 0.1s, background 0.2s;
+            margin: 10px;
+            width: 80%;
+            max-width: 250px;
+        }
+        .btn:active {
+            transform: scale(0.95);
+        }
+        .btn-secondary {
+            background: linear-gradient(135deg, #4361ee, #4895ef);
+            box-shadow: 0 5px 15px rgba(67, 97, 238, 0.4);
+        }
+        .hud {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            right: 15px;
+            display: flex;
+            justify-content: space-between;
+            font-size: 1.1rem;
+            font-weight: bold;
+            z-index: 5;
+            pointer-events: none;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+        }
+        .controls-hint {
+            position: absolute;
+            bottom: 15px;
+            width: 100%;
+            text-align: center;
+            font-size: 0.9rem;
+            color: rgba(255,255,255,0.7);
+            pointer-events: none;
+            z-index: 5;
+        }
+        /* Mobile Touch Buttons */
+        .touch-controls {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 120px;
+            display: flex;
+            justify-content: space-between;
+            padding: 0 30px 20px 30px;
+            box-sizing: border-box;
+            z-index: 6;
+            pointer-events: auto;
+        }
+        .touch-btn {
+            width: 80px;
+            height: 80px;
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            border-radius: 50%;
+            font-size: 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            cursor: pointer;
+            backdrop-filter: blur(5px);
+        }
+        .touch-btn:active {
+            background: rgba(255, 255, 255, 0.4);
+        }
+        .shop-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+            width: 100%;
+            max-width: 350px;
+        }
+        .shop-item {
+            background: rgba(255,255,255,0.1);
+            border: 2px solid rgba(255,255,255,0.2);
+            border-radius: 12px;
+            padding: 12px;
+            text-align: center;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .shop-item.selected {
+            border-color: #ffd700;
+            background: rgba(255,215,0,0.15);
+        }
+        .shop-item h3 {
+            margin: 5px 0;
+            font-size: 1rem;
+        }
+        .shop-item p {
+            margin: 0;
+            font-size: 0.85rem;
+            color: #ffd700;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <!-- HUD trong game -->
+        <div id="hud" class="hud hidden">
+            <div>Vạch đích: <span id="distance-val">0</span>m / 2000m</div>
+            <div>🪙 <span id="coins-val">0</span></div>
+        </div>
+
+        <!-- Hướng dẫn điều khiển -->
+        <div id="controls-hint" class="controls-hint hidden">Dùng phím ⬅️ ➡️ hoặc nút cảm ứng để đổi làn</div>
+
+        <!-- Điều khiển cảm ứng mobile -->
+        <div id="touch-controls" class="touch-controls hidden">
+            <div class="touch-btn" id="btn-left">◀</div>
+            <div class="touch-btn" id="btn-right">▶</div>
+        </div>
+
+        <canvas id="gameCanvas"></canvas>
+
+        <!-- Màn hình MENU CHÍNH -->
+        <div id="menu-screen" class="ui-screen">
+            <h1>🦆 ĐUA VỊT PRO</h1>
+            <p>Né chướng ngại vật, thu thập hạt ngô và về đích đầu tiên!</p>
+            <button class="btn" id="start-btn">BẮT ĐẦU ĐUA</button>
+            <button class="btn btn-secondary" id="shop-btn">CỬA HÀNG VỊT</button>
+        </div>
+
+        <!-- Màn hình CỬA HÀNG -->
+        <div id="shop-screen" class="ui-screen hidden">
+            <h1>CỬA HÀNG</h1>
+            <p>Số xu của bạn: 🪙 <span id="shop-coins">0</span></p>
+            <div class="shop-grid" id="skin-list">
+                <!-- Javascript sẽ render các skin vịt vào đây -->
+            </div>
+            <button class="btn btn-secondary" id="back-shop-btn">QUAY LẠI</button>
+        </div>
+
+        <!-- Màn hình KẾT THÚC (THẮNG / THUA) -->
+        <div id="gameover-screen" class="ui-screen hidden">
+            <h1 id="go-title">THẮNG RỒI!</h1>
+            <p id="go-desc">Bạn đã về đích hạng 1!</p>
+            <p>Phần thưởng: 🪙 +<span id="earned-coins">50</span></p>
+            <button class="btn" id="restart-btn">CHƠI LẠI</button>
+            <button class="btn btn-secondary" id="menu-btn">MENU CHÍNH</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Thiết lập kích thước canvas tự thích ứng
+        function resizeCanvas() {
+            const container = document.getElementById('game-container');
+            canvas.width = container.clientWidth;
+            canvas.height = container.clientHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // Âm thanh Web Audio API cơ bản
+        let audioCtx = null;
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+        }
+        function playSound(type) {
+            if (!audioCtx) return;
+            try {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                if (type === 'coin') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(600, audioCtx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(1200, audioCtx.currentTime + 0.15);
+                    gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                    gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.15);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.15);
+                } else if (type === 'hit') {
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+                    osc.frequency.linearRampToValueAtTime(50, audioCtx.currentTime + 0.2);
+                    gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                    gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.2);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.2);
+                } else if (type === 'win') {
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(440, audioCtx.currentTime);
+                    osc.frequency.setValueAtTime(554.37, audioCtx.currentTime + 0.1);
+                    osc.frequency.setValueAtTime(659.25, audioCtx.currentTime + 0.2);
+                    gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                    gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.4);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.4);
+                }
+            } catch(e) {}
+        }
+
+        // Dữ liệu người chơi & Lưu trữ
+        let gameData = JSON.parse(localStorage.getItem('duck_racing_data')) || {
+            coins: 100,
+            selectedSkin: 'default',
+            unlockedSkins: ['default']
+        };
+
+        function saveGameData() {
+            localStorage.setItem('duck_racing_data', JSON.stringify(gameData));
+        }
+
+        const skins = {
+            'default': { name: 'Vịt Vàng', color: '#ffcc00', beak: '#ff6600', price: 0 },
+            'cyber': { name: 'Cyber Vịt', color: '#00ffff', beak: '#ff00ff', price: 150 },
+            'ninja': { name: 'Ninja Vịt', color: '#333333', beak: '#ffaa00', price: 300 },
+            'golden': { name: 'Vịt Đại Gia', color: '#ffd700', beak: '#ff4500', price: 500 }
+        };
+
+        // Trạng thái game
+        let gameState = 'MENU'; // MENU, SHOP, PLAYING, GAMEOVER
+        let scoreCoins = 0;
+        let distance = 0;
+        const targetDistance = 2000; // mét
+
+        // Làn đường (3 làn)
+        const lanes = [0.22, 0.5, 0.78]; // Tỉ lệ phần trăm chiều rộng canvas
+        let playerLane = 1; // 0: Trái, 1: Giữa, 2: Phải
+        let playerX = 0;
+        let playerY = 0;
+
+        let obstacles = [];
+        let rivals = [];
+        let roadOffset = 0;
+        let gameSpeed = 6;
+
+        // Khởi tạo người chơi
+        function initGame() {
+            distance = 0;
+            scoreCoins = 0;
+            playerLane = 1;
+            obstacles = [];
+            rivals = [
+                { lane: 0, y: -200, speed: 5.5, color: '#e74c3c', name: 'Đỏ' },
+                { lane: 2, y: -400, speed: 5.8, color: '#3498db', name: 'Xanh' }
+            ];
+            gameSpeed = 6;
+        }
+
+        // Tạo chướng ngại vật hoặc xu ngẫu nhiên
+        let spawnTimer = 0;
+        function updateEntities() {
+            distance += gameSpeed * 0.2;
+            roadOffset = (roadOffset + gameSpeed) % 40;
+
+            spawnTimer++;
+            if (spawnTimer > 45) {
+                spawnTimer = 0;
+                let lane = Math.floor(Math.random() * 3);
+                let type = Math.random() < 0.35 ? 'coin' : (Math.random() < 0.7 ? 'rock' : 'log');
+                obstacles.push({ lane: lane, y: -100, type: type });
+            }
+
+            // Cập nhật chướng ngại vật
+            for (let i = obstacles.length - 1; i >= 0; i--) {
+                obstacles[i].y += gameSpeed;
+
+                // Kiểm tra va chạm với player
+                let targetX = canvas.width * lanes[playerLane];
+                let obsX = canvas.width * lanes[obstacles[i].lane];
+                let playerDrawY = canvas.height - 120;
+
+                if (Math.abs(obstacles[i].y - playerDrawY) < 40 && obstacles[i].lane === playerLane) {
+                    if (obstacles[i].type === 'coin') {
+                        scoreCoins += 5;
+                        playSound('coin');
+                        obstacles.splice(i, 1);
+                        continue;
+                    } else {
+                        // Va chạm chướng ngại vật -> giảm tốc độ / trừ điểm hoặc thua
+                        playSound('hit');
+                        gameSpeed = Math.max(3, gameSpeed - 2);
+                        obstacles.splice(i, 1);
+                        continue;
+                    }
+                }
+
+                // Xóa vật thể khi ra khỏi màn hình
+                if (obstacles[i].y > canvas.height + 50) {
+                    obstacles.splice(i, 1);
+                }
+            }
+
+            // Cập nhật đối thủ (rivals)
+            rivals.forEach(rival => {
+                rival.y += rival.speed - (gameSpeed * 0.3);
+                if (rival.y > canvas.height + 100) {
+                    rival.y = -300 - Math.random() * 200;
+                    rival.lane = Math.floor(Math.random() * 3);
+                }
+            });
+
+            // Tăng dần tốc độ
+            if (gameSpeed < 12) {
+                gameSpeed += 0.001;
+            }
+
+            // Kiểm tra về đích
+            if (distance >= targetDistance) {
+                endGame(true);
+            }
+        }
+
+        // Vẽ đồ họa game trên Canvas
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Vẽ sông / đường đua
+            ctx.fillStyle = '#3a5a40'; // Cỏ ven sông
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.fillStyle = '#2b4162'; // Lòng sông nước
+            let roadWidth = canvas.width * 0.8;
+            let roadLeft = (canvas.width - roadWidth) / 2;
+            ctx.fillRect(roadLeft, 0, roadWidth, canvas.height);
+
+            // Vẽ vạch kẻ làn đường
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+            ctx.lineWidth = 4;
+            ctx.setLineDash([20, 20]);
+            ctx.lineDashOffset = -roadOffset;
+            
+            ctx.beginPath();
+            ctx.moveTo(canvas.width * 0.38, 0);
+            ctx.lineTo(canvas.width * 0.38, canvas.height);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(canvas.width * 0.62, 0);
+            ctx.lineTo(canvas.width * 0.62, canvas.height);
+            ctx.stroke();
+            ctx.setLineDash([]); // Reset line dash
+
+            // Vẽ chướng ngại vật & xu
+            obstacles.forEach(obs => {
+                let x = canvas.width * lanes[obs.lane];
+                let y = obs.y;
+                if (obs.type === 'coin') {
+                    ctx.fillStyle = '#ffd700';
+                    ctx.beginPath();
+                    ctx.arc(x, y, 16, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.fillStyle = '#b38f00';
+                    ctx.font = 'bold 16px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('🪙', x, y + 6);
+                } else if (obs.type === 'rock') {
+                    ctx.fillStyle = '#7f8c8d';
+                    ctx.beginPath();
+                    ctx.arc(x, y, 22, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.fillStyle = '#95a5a6';
+                    ctx.beginPath();
+                    ctx.arc(x - 5, y - 5, 8, 0, Math.PI * 2);
+                    ctx.fill();
+                } else { // log
+                    ctx.fillStyle = '#8d5524';
+                    ctx.fillRect(x - 30, y - 15, 60, 30);
+                    ctx.fillStyle = '#653d12';
+                    ctx.fillRect(x - 25, y - 10, 50, 20);
+                }
+            });
+
+            // Vẽ đối thủ
+            rivals.forEach(rival => {
+                let rx = canvas.width * lanes[rival.lane];
+                let ry = rival.y;
+                drawDuck(rx, ry, rival.color, '#d35400', false);
+            });
+
+            // Vẽ người chơi
+            let targetX = canvas.width * lanes[playerLane];
+            playerX += (targetX - playerX) * 0.2; // Hiệu ứng mượt khi đổi làn
+            playerY = canvas.height - 120;
+            let currentSkin = skins[gameData.selectedSkin] || skins['default'];
+            drawDuck(playerX, playerY, currentSkin.color, currentSkin.beak, true);
+
+            // Cập nhật HUD trên màn hình
+            document.getElementById('distance-val').innerText = Math.floor(distance);
+            document.getElementById('coins-val').innerText = scoreCoins;
+        }
+
+        // Hàm vẽ con vịt đáng yêu
+        function drawDuck(x, y, bodyColor, beakColor, isPlayer) {
+            ctx.save();
+            ctx.translate(x, y);
+
+            // Thân vịt
+            ctx.fillStyle = bodyColor;
+            ctx.beginPath();
+            ctx.ellipse(0, 5, 24, 30, 0, 0, Math.PI * 2);
+            ctx.fill();
+            if (isPlayer) {
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            }
+
+            // Đầu vịt
+            ctx.beginPath();
+            ctx.arc(0, -18, 16, 0, Math.PI * 2);
+            ctx.fill();
+            if (isPlayer) ctx.stroke();
+
+            // Mỏ vịt
+            ctx.fillStyle = beakColor;
+            ctx.beginPath();
+            ctx.moveTo(-8, -16);
+            ctx.lineTo(8, -16);
+            ctx.lineTo(0, -4);
+            ctx.closePath();
+            ctx.fill();
+
+            // Mắt vịt
+            ctx.fillStyle = '#000';
+            ctx.beginPath();
+            ctx.arc(-6, -22, 3, 0, Math.PI * 2);
+            ctx.arc(6, -22, 3, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Má hồng dễ thương
+            ctx.fillStyle = 'rgba(255, 100, 100, 0.5)';
+            ctx.beginPath();
+            ctx.arc(-10, -16, 4, 0, Math.PI * 2);
+            ctx.arc(10, -16, 4, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.restore();
+        }
+
+        // Vòng lặp game (Game Loop)
+        function gameLoop() {
+            if (gameState === 'PLAYING') {
+                updateEntities();
+                draw();
+                requestAnimationFrame(gameLoop);
+            }
+        }
+
+        // Điều khiển bàn phím
+        window.addEventListener('keydown', (e) => {
+            if (gameState !== 'PLAYING') return;
+            if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
+                if (playerLane > 0) playerLane--;
+            } else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
+                if (playerLane < 2) playerLane++;
+            }
+        });
+
+        // Điều khiển cảm ứng nút di chuyển
+        document.getElementById('btn-left').addEventListener('click', () => {
+            if (gameState === 'PLAYING' && playerLane > 0) playerLane--;
+        });
+        document.getElementById('btn-right').addEventListener('click', () => {
+            if (gameState === 'PLAYING' && playerLane < 2) playerLane++;
+        });
+
+        // Chuyển màn hình & UI logic
+        const menuScreen = document.getElementById('menu-screen');
+        const shopScreen = document.getElementById('shop-screen');
+        const gameoverScreen = document.getElementById('gameover-screen');
+        const hud = document.getElementById('hud');
+        const controlsHint = document.getElementById('controls-hint');
+        const touchControls = document.getElementById('touch-controls');
+
+        document.getElementById('start-btn').addEventListener('click', () => {
+            initAudio();
+            menuScreen.classList.add('hidden');
+            hud.classList.remove('hidden');
+            controlsHint.classList.remove('hidden');
+            touchControls.classList.remove('hidden');
+            gameState = 'PLAYING';
+            initGame();
+            gameLoop();
+        });
+
+        document.getElementById('shop-btn').addEventListener('click', () => {
+            renderShop();
+            menuScreen.classList.add('hidden');
+            shopScreen.classList.remove('hidden');
+            gameState = 'SHOP';
+        });
+
+        document.getElementById('back-shop-btn').addEventListener('click', () => {
+            shopScreen.classList.add('hidden');
+            menuScreen.classList.remove('hidden');
+            gameState = 'MENU';
+        });
+
+        document.getElementById('restart-btn').addEventListener('click', () => {
+            gameoverScreen.classList.add('hidden');
+            hud.classList.remove('hidden');
+            controlsHint.classList.remove('hidden');
+            touchControls.classList.remove('hidden');
+            gameState = 'PLAYING';
+            initGame();
+            gameLoop();
+        });
+
+        document.getElementById('menu-btn').addEventListener('click', () => {
+            gameoverScreen.classList.add('hidden');
+            menuScreen.classList.remove('hidden');
+            gameState = 'MENU';
+        });
+
+        function endGame(won) {
+            gameState = 'GAMEOVER';
+            hud.classList.add('hidden');
+            controlsHint.classList.add('hidden');
+            touchControls.classList.add('hidden');
+
+            playSound('win');
+            gameData.coins += scoreCoins;
+            saveGameData();
+
+            document.getElementById('go-title').innerText = won ? '🎉 VỀ ĐÍCH THÀNH CÔNG!' : '💥 KẾT THÚC!';
+            document.getElementById('go-desc').innerText = won ? 'Bạn đã hoàn thành chặng đua 2000m xuất sắc!' : 'Cố gắng lần sau nhé!';
+            document.getElementById('earned-coins').innerText = scoreCoins;
+            gameoverScreen.classList.remove('hidden');
+        }
+
+        // Render cửa hàng skin
+        function renderShop() {
+            document.getElementById('shop-coins').innerText = gameData.coins;
+            const skinListContainer = document.getElementById('skin-list');
+            skinListContainer.innerHTML = '';
+
+            for (let key in skins) {
+                let skin = skins[key];
+                let isUnlocked = gameData.unlockedSkins.includes(key);
+                let isSelected = gameData.selectedSkin === key;
+
+                let div = document.createElement('div');
+                div.className = `shop-item ${isSelected ? 'selected' : ''}`;
+                div.innerHTML = `
+                    <h3>${skin.name}</h3>
+                    <p>${isUnlocked ? (isSelected ? 'Đang dùng' : 'Đã sở hữu') : '🪙 ' + skin.price}</p>
+                `;
+
+                div.addEventListener('click', () => {
+                    if (isUnlocked) {
+                        gameData.selectedSkin = key;
+                        saveGameData();
+                        renderShop();
+                    } else {
+                        if (gameData.coins >= skin.price) {
+                            gameData.coins -= skin.price;
+                            gameData.unlockedSkins.push(key);
+                            gameData.selectedSkin = key;
+                            saveGameData();
+                            renderShop();
+                            playSound('coin');
+                        } else {
+                            alert('Bạn không đủ xu để mua skin này!');
+                        }
+                    }
+                });
+                skinListContainer.appendChild(div);
+            }
+        }
+    </script>
+</body>
+</html>
